@@ -1,4 +1,4 @@
-on: [push, pull_request]
+on: [push, pull_request_target]
 permissions:
   contents: write
   pull-requests: write
@@ -6,10 +6,16 @@ env:
   RUST_BACKTRACE: 1
 jobs:
   ci:
-    environment: pull_request_deployments
+    environment: pull_request_deployment
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        if: github.event_name == 'pull_request_target'
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.ref }}
+      - uses: actions/checkout@v3
+        if: github.event_name == 'push'
       - run: rustup update
       - id: get-rust-version
         run: echo "rust_version=$(rustc --version)" >> $GITHUB_OUTPUT
@@ -46,12 +52,12 @@ jobs:
             exit 1
           fi
       - id: deploy
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request_target'
         run: |
           npx vercel pull --yes --environment=preview --scope mobusoperandi --token=${{ secrets.VERCEL_TOKEN }}
           URL=$(npx vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
           echo "URL=$URL" >> $GITHUB_OUTPUT
-      - if: github.event_name == 'pull_request'
+      - if: github.event_name == 'pull_request_target'
         uses: thollander/actions-comment-pull-request@v2
         with:
           message: |
